@@ -1779,10 +1779,11 @@ class TCPRelay(object):
                     self.multi_user_table[id][
                         '_forbidden_portset'] = PortRange(str(""))
 
-        if 'node_speedlimit' not in config or 'users_table' in self._config:
-            self.bandwidth = 0
-        else:
-            self.bandwidth = float(config['node_speedlimit']) * 128
+        if not hasattr(self, 'bandwidth') or self.bandwidth == 0:
+            if 'node_speedlimit' not in config: # or 'users_table' in self._config:
+                self.bandwidth = 0
+            else:
+                self.bandwidth = float(config['node_speedlimit']) * 128
 
         self.speed_tester_u = SpeedTester(self.bandwidth)
         self.speed_tester_d = SpeedTester(self.bandwidth)
