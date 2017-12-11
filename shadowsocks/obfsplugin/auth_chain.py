@@ -17,8 +17,6 @@
 from __future__ import absolute_import, division, print_function, \
     with_statement
 
-import os
-import sys
 import hashlib
 import logging
 import binascii
@@ -28,15 +26,16 @@ import datetime
 import random
 import math
 import struct
-import zlib
 import hmac
-import hashlib
 import bisect
 
 import shadowsocks
 from shadowsocks import common, lru_cache, encrypt
 from shadowsocks.obfsplugin import plain
 from shadowsocks.common import to_bytes, to_str, ord, chr
+from shadowsocks.crypto import openssl
+
+rand_bytes = openssl.rand_bytes
 
 def create_auth_chain_a(method):
     return auth_chain_a(method)
@@ -321,7 +320,7 @@ class auth_chain_a(auth_base):
     def rnd_data(self, buf_size, buf, last_hash, random):
         rand_len = self.rnd_data_len(buf_size, last_hash, random)
 
-        rnd_data_buf = os.urandom(rand_len)
+        rnd_data_buf = rand_bytes(rand_len)
 
         if buf_size == 0:
             return rnd_data_buf
@@ -362,7 +361,7 @@ class auth_chain_a(auth_base):
         data = data + (struct.pack('<H', self.server_info.overhead) + struct.pack('<H', 0))
         mac_key = self.server_info.iv + self.server_info.key
 
-        check_head = os.urandom(4)
+        check_head = rand_bytes(4)
         self.last_client_hash = hmac.new(mac_key, check_head, self.hashfunc).digest()
         check_head += self.last_client_hash[:8]
 
@@ -372,9 +371,9 @@ class auth_chain_a(auth_base):
                 self.user_key = items[1]
                 uid = struct.pack('<I', int(items[0]))
             except:
-                uid = os.urandom(4)
+                uid = rand_bytes(4)
         else:
-            uid = os.urandom(4)
+            uid = rand_bytes(4)
         if self.user_key is None:
             self.user_key = self.server_info.key
 
@@ -393,9 +392,9 @@ class auth_chain_a(auth_base):
         if self.server_info.data.connection_id > 0xFF000000:
             self.server_info.data.local_client_id = b''
         if not self.server_info.data.local_client_id:
-            self.server_info.data.local_client_id = os.urandom(4)
+            self.server_info.data.local_client_id = rand_bytes(4)
             logging.debug("local_client_id %s" % (binascii.hexlify(self.server_info.data.local_client_id),))
-            self.server_info.data.connection_id = struct.unpack('<I', os.urandom(4))[0] & 0xFFFFFF
+            self.server_info.data.connection_id = struct.unpack('<I', rand_bytes(4))[0] & 0xFFFFFF
         self.server_info.data.connection_id += 1
         return b''.join([struct.pack('<I', utc_time),
                 self.server_info.data.local_client_id,
@@ -584,9 +583,9 @@ class auth_chain_a(auth_base):
                 except:
                     pass
             if self.user_key is None:
-                self.user_id = os.urandom(4)
+                self.user_id = rand_bytes(4)
                 self.user_key = self.server_info.key
-        authdata = os.urandom(3)
+        authdata = rand_bytes(3)
         mac_key = self.server_info.key
         md5data = hmac.new(mac_key, authdata, self.hashfunc).digest()
         uid = struct.unpack('<I', self.user_id)[0] ^ struct.unpack('<I', md5data[:4])[0]
@@ -594,7 +593,7 @@ class auth_chain_a(auth_base):
         rand_len = self.udp_rnd_data_len(md5data, self.random_client)
         encryptor = encrypt.Encryptor(to_bytes(base64.b64encode(self.user_key)) + to_bytes(base64.b64encode(md5data)), 'rc4')
         out_buf = encryptor.encrypt(buf)
-        buf = out_buf + os.urandom(rand_len) + authdata + uid
+        buf = out_buf + rand_bytes(rand_len) + authdata + uid
         return buf + hmac.new(self.user_key, buf, self.hashfunc).digest()[:1]
 
     def client_udp_post_decrypt(self, buf):
@@ -617,13 +616,13 @@ class auth_chain_a(auth_base):
                 user_key = self.server_info.key
             else:
                 user_key = self.server_info.recv_iv
-        authdata = os.urandom(7)
+        authdata = rand_bytes(7)
         mac_key = self.server_info.key
         md5data = hmac.new(mac_key, authdata, self.hashfunc).digest()
         rand_len = self.udp_rnd_data_len(md5data, self.random_server)
         encryptor = encrypt.Encryptor(to_bytes(base64.b64encode(user_key)) + to_bytes(base64.b64encode(md5data)), 'rc4')
         out_buf = encryptor.encrypt(buf)
-        buf = out_buf + os.urandom(rand_len) + authdata
+        buf = out_buf + rand_bytes(rand_len) + authdata
         return buf + hmac.new(user_key, buf, self.hashfunc).digest()[:1]
 
     def server_udp_post_decrypt(self, buf):
