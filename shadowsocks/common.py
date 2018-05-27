@@ -136,6 +136,16 @@ def is_ip(address):
     return False
 
 
+def sync_str_bytes(obj, target_example):
+    """sync (obj)'s type to (target_example)'s type"""
+    if type(obj) != type(target_example):
+        if type(target_example) == str:
+            obj = to_str(obj)
+        if type(target_example) == bytes:
+            obj = to_bytes(obj)
+    return obj
+
+
 def match_ipv4_address(text):
     reip = re.compile(r'(?<![\.\d])(?:\d{1,3}\.){3}\d{1,3}(?![\.\d])')
     for ip in reip.findall(text):
@@ -152,6 +162,8 @@ def match_ipv6_address(text):
 
 
 def match_regex(regex, text):
+    # avoid 'cannot use a string pattern on a bytes-like object'
+    regex = sync_str_bytes(regex, text)
     regex = re.compile(regex)
     for item in regex.findall(text):
         return True
@@ -444,12 +456,12 @@ def test_inet_conv():
 
 def test_parse_header():
     assert parse_header(b'\x03\x0ewww.google.com\x00\x50') == \
-        (0, b'www.google.com', 80, 18)
+        (0, ADDRTYPE_HOST ,b'www.google.com', 80, 18)
     assert parse_header(b'\x01\x08\x08\x08\x08\x00\x35') == \
-        (0, b'8.8.8.8', 53, 7)
+        (0, ADDRTYPE_IPV4 ,b'8.8.8.8', 53, 7)
     assert parse_header((b'\x04$\x04h\x00@\x05\x08\x05\x00\x00\x00\x00\x00'
                          b'\x00\x10\x11\x00\x50')) == \
-        (0, b'2404:6800:4005:805::1011', 80, 19)
+        (0, ADDRTYPE_IPV6 ,b'2404:6800:4005:805::1011', 80, 19)
 
 
 def test_pack_header():
@@ -474,7 +486,26 @@ def test_ip_network():
     assert 'www.google.com' not in ip_network
 
 
+def test_sync_str_bytes():
+    assert sync_str_bytes(b'a\.b', b'a\.b') == b'a\.b'
+    assert sync_str_bytes('a\.b', b'a\.b') == b'a\.b'
+    assert sync_str_bytes(b'a\.b', 'a\.b') == 'a\.b'
+    assert sync_str_bytes('a\.b', 'a\.b') == 'a\.b'
+    pass
+
+
+def test_match_regex():
+    assert match_regex(br'a\.b', b'abc,aaa,aaa,b,aaa.b,a.b')
+    assert match_regex(r'a\.b', b'abc,aaa,aaa,b,aaa.b,a.b')
+    assert match_regex(br'a\.b', b'abc,aaa,aaa,b,aaa.b,a.b')
+    assert match_regex(r'a\.b', b'abc,aaa,aaa,b,aaa.b,a.b')
+    assert match_regex(r'\bgoogle\.com\b', b' google.com ')
+    pass
+
+
 if __name__ == '__main__':
+    test_sync_str_bytes()
+    test_match_regex()
     test_inet_conv()
     test_parse_header()
     test_pack_header()
