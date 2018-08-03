@@ -91,8 +91,9 @@ class KqueueLoop(object):
         self._control(fd, mode, select.KQ_EV_ADD)
 
     def unregister(self, fd):
-        self._control(fd, self._fds[fd], select.KQ_EV_DELETE)
-        del self._fds[fd]
+        if fd in self._fds:
+            self._control(fd, self._fds[fd], select.KQ_EV_DELETE)
+            del self._fds[fd]
 
     def modify(self, fd, mode):
         self.unregister(fd)
@@ -174,18 +175,21 @@ class EventLoop(object):
 
     def remove(self, f):
         fd = f.fileno()
-        del self._fdmap[fd]
-        self._impl.unregister(fd)
+        if fd in self._fdmap:
+            del self._fdmap[fd]
+            self._impl.unregister(fd)
 
     def removefd(self, fd):
-        del self._fdmap[fd]
-        self._impl.unregister(fd)
+        if fd in self._fdmap:
+            del self._fdmap[fd]
+            self._impl.unregister(fd)
 
     def add_periodic(self, callback):
         self._periodic_callbacks.append(callback)
 
     def remove_periodic(self, callback):
-        self._periodic_callbacks.remove(callback)
+        if callback in self._periodic_callbacks:
+            self._periodic_callbacks.remove(callback)
 
     def modify(self, f, mode):
         fd = f.fileno()
