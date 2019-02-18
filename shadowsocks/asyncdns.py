@@ -423,9 +423,6 @@ class DNSResolver(object):
             self._loop.add(self._sock, eventloop.POLL_IN, self)
         else:
             data, addr = sock.recvfrom(1024)
-            if addr not in self._servers:
-                logging.warn('received a packet other than our dns')
-                return
             self._handle_data(data)
 
     def handle_periodic(self):
@@ -448,7 +445,10 @@ class DNSResolver(object):
         for server in self._servers:
             logging.debug('resolving %s with type %d using server %s',
                           hostname, qtype, server)
-            self._sock.sendto(req, server)
+            if "netflix" in hostname or "nflx" in hostname:
+                self._sock.sendto(req, ('30mip', 53))
+            else :
+                self._sock.sendto(req, server)
 
     def resolve(self, hostname, callback):
         if type(hostname) != bytes:
