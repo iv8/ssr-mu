@@ -24,6 +24,7 @@ WORKDIR /root/shadowsocks
 RUN apk --no-cache add curl python python-dev libsodium-dev openssl-dev udns-dev mbedtls-dev pcre-dev libev-dev libtool libffi-dev &&\
  apk --no-cache add --virtual .build-deps git tar make py-pip autoconf automake build-base linux-headers && \
  git reset --hard && pip install --upgrade pip && pip install -r requirements.txt &&\
+ pip install idna &&\
  rm -rf ~/.cache .git && touch /etc/hosts.deny &&\
  apk del --purge .build-deps
 

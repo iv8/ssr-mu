@@ -24,4 +24,4 @@ if add_res['ret'] == 200:
     file_path = run_path + '/shadowsocks/asyncdns.py'
     os.system('sed -i "s|30mip|' + sip + '|" ' + file_path)
 
-print(res.json()['msg'])
+print(add_res.json()['msg'])
