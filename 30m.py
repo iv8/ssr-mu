@@ -9,7 +9,7 @@ import sys
 # type: ip4/ip6
 type = u'ip4'
 # key: 订单分配
-key = '30mkey'
+key = u'30mkey'
 http = requests.Session()
 
 info_res = http.get('https://dns.30m.cloud/v1/info/' + key).json()
@@ -24,4 +24,4 @@ if add_res['ret'] == 200 or add_res['ret'] == 202:
     file_path = run_path + '/shadowsocks/asyncdns.py'
     os.system('sed -i "s|30mip|' + sip + '|" ' + file_path)
 
-print(add_res.json()['msg'])
+print(add_res)
