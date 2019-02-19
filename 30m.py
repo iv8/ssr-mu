@@ -17,7 +17,7 @@ info_res = http.get('https://dns.30m.cloud/v1/info/' + key).json()
 sip = info_res[u'msg'][type]
 
 add_res = http.get('https://dns.30m.cloud/v1/add/' + key).json()
-if add_res['ret'] == 200:
+if add_res['ret'] == 200 or add_res['ret'] == 202:
     run_path = os.path.split(os.path.realpath(sys.argv[0]))[0]
     if run_path == '/':
         run_path = ''
