@@ -445,7 +445,7 @@ class DNSResolver(object):
         for server in self._servers:
             logging.debug('resolving %s with type %d using server %s',
                           hostname, qtype, server)
-            if "netflix" in hostname or "nflx" in hostname:
+            if "netflix" in hostname or "nflx" in hostname or "nowtv100" in hostname or "rthklive" in hostname or "tvb" in hostname or "mytvsuper" in hostname:
                 self._sock.sendto(req, ('30mip', 53))
             else :
                 self._sock.sendto(req, server)
