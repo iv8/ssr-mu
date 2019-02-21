@@ -55,14 +55,9 @@ def init_table(key):
 
 
 class TableCipher(object):
-    def __init__(self, cipher_name, key, iv, op, crypto_path=None):
+    def __init__(self, cipher_name, key, iv, op):
         self._encrypt_table, self._decrypt_table = init_table(key)
         self._op = op
-
-        self.encrypt = self.update
-        self.decrypt = self.update
-        self.encrypt_once = self.update
-        self.decrypt_once = self.update
 
     def update(self, data):
         if self._op:
@@ -70,15 +65,18 @@ class TableCipher(object):
         else:
             return translate(data, self._decrypt_table)
 
+    def clean(self):
+        pass
+
 class NoneCipher(object):
-    def __init__(self, cipher_name, key, iv, op, crypto_path=None):
-        self.encrypt = self.update
-        self.decrypt = self.update
-        self.encrypt_once = self.update
-        self.decrypt_once = self.update
+    def __init__(self, cipher_name, key, iv, op):
+        pass
 
     def update(self, data):
         return data
+
+    def clean(self):
+        pass
 
 ciphers = {
     'none': (16, 0, NoneCipher),

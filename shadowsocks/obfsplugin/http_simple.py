@@ -63,6 +63,7 @@ class http_simple(plain.plain):
         self.host = None
         self.port = 0
         self.recv_buffer = b''
+        # TODO user config user_agent
         self.user_agent = [b"Mozilla/5.0 (Windows NT 6.3; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
             b"Mozilla/5.0 (Windows NT 6.3; WOW64; rv:40.0) Gecko/20100101 Firefox/44.0",
             b"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36",
@@ -100,7 +101,8 @@ class http_simple(plain.plain):
         hosts = (self.server_info.obfs_param or self.server_info.host)
         pos = hosts.find("#")
         if pos >= 0:
-            body = hosts[pos + 1:].replace("\\n", "\r\n")
+            body = hosts[pos + 1:].replace("\n", "\r\n")
+            body = body.replace("\\n", "\r\n")
             hosts = hosts[:pos]
         hosts = hosts.split(',')
         host = random.choice(hosts)
@@ -179,7 +181,7 @@ class http_simple(plain.plain):
         self.recv_buffer += buf
         buf = self.recv_buffer
         if len(buf) > 10:
-            if match_begin(buf, b'GET /') or match_begin(buf, b'POST /'):
+            if match_begin(buf, b'GET ') or match_begin(buf, b'POST '):
                 if len(buf) > 65536:
                     self.recv_buffer = None
                     logging.warn('http_simple: over size')
@@ -199,8 +201,8 @@ class http_simple(plain.plain):
                 pos = host.find(":")
                 if pos >= 0:
                     host = host[:pos]
-                hosts = self.server_info.obfs_param.split(b',')
-                if common.to_bytes(host) not in hosts:
+                hosts = self.server_info.obfs_param.split(',')
+                if host not in hosts:
                     return self.not_match_return(buf)
             if len(ret_buf) < 4:
                 return self.error_return(buf)
@@ -208,7 +210,7 @@ class http_simple(plain.plain):
                 ret_buf += datas[1]
             if len(ret_buf) >= 13:
                 self.has_recv_header = True
-                return (ret_buf, True, False, host)
+                return (ret_buf, True, False)
             return self.not_match_return(buf)
         else:
             return (b'', True, False)
@@ -260,45 +262,6 @@ class http_post(http_simple):
             return (b'E'*2048, False, False)
         return (buf, True, False)
 
-    def server_decode(self, buf):
-        if self.has_recv_header:
-            return (buf, True, False)
-
-        self.recv_buffer += buf
-        buf = self.recv_buffer
-        if len(buf) > 10:
-            if match_begin(buf, b'GET ') or match_begin(buf, b'POST '):
-                if len(buf) > 65536:
-                    self.recv_buffer = None
-                    logging.warn('http_post: over size')
-                    return self.not_match_return(buf)
-            else: #not http header, run on original protocol
-                self.recv_buffer = None
-                logging.debug('http_post: not match begin')
-                return self.not_match_return(buf)
-        else:
-            return (b'', True, False)
-
-        if b'\r\n\r\n' in buf:
-            datas = buf.split(b'\r\n\r\n', 1)
-            ret_buf = self.get_data_from_http_header(buf)
-            host = self.get_host_from_http_header(buf)
-            if host and self.server_info.obfs_param:
-                pos = host.find(b":")
-                if pos >= 0:
-                    host = host[:pos]
-                hosts = self.server_info.obfs_param.split(b',')
-                if common.to_bytes(host) not in hosts:
-                    return self.not_match_return(buf)
-            if len(datas) > 1:
-                ret_buf += datas[1]
-            if len(ret_buf) >= 7:
-                self.has_recv_header = True
-                return (ret_buf, True, False, host)
-            return self.not_match_return(buf)
-        else:
-            return (b'', True, False)
-
 class random_head(plain.plain):
     def __init__(self, method):
         self.method = method
@@ -349,3 +312,4 @@ class random_head(plain.plain):
             return (buf, True, False)
         # (buffer_to_recv, is_need_decrypt, is_need_to_encode_and_send_back)
         return (b'', False, True)
+

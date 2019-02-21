@@ -1,106 +1,53 @@
-shadowsocks
-===========
+SSRR 3.2.2
 
-[![PyPI version]][PyPI]
-[![Build Status]][Travis CI]
-[![Coverage Status]][Coverage]
+兼容SSRPanel的自改版SSR(R)后端，可兼容原版SS、SSR
 
-A fast tunnel proxy that helps you bypass firewalls.
+#### 1.安装
 
-Server
-------
+    git clone https://github.com/ssrpanel/shadowsocksr.git
 
-### Install
+或者通过wget下载
 
-Debian / Ubuntu:
-
-    apt-get install python-pip
-    pip install shadowsocks
-
-CentOS:
-
-    yum install python-setuptools && easy_install pip
-    pip install shadowsocks
-
-Windows:
-
-See [Install Server on Windows]
-
-### Usage
-
-    ssserver -p 443 -k password -m aes-256-cfb
-
-To run in the background:
-
-    sudo ssserver -p 443 -k password -m aes-256-cfb --user nobody -d start
-
-To stop:
-
-    sudo ssserver -d stop
-
-To check the log:
-
-    sudo less /var/log/shadowsocks.log
-
-Check all the options via `-h`. You can also use a [Configuration] file
-instead.
-
-Client
-------
-
-* [Windows] / [OS X]
-* [Android] / [iOS]
-* [OpenWRT]
-
-Use GUI clients on your local PC/phones. Check the README of your client
-for more information.
-
-Documentation
--------------
-
-You can find all the documentation in the [Wiki].
-
-License
--------
-
-Copyright 2015 clowwindy
-
-Licensed under the Apache License, Version 2.0 (the "License"); you may
-not use this file except in compliance with the License. You may obtain
-a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-License for the specific language governing permissions and limitations
-under the License.
-
-Bugs and Issues
-----------------
-
-* [Troubleshooting]
-* [Issue Tracker]
-* [Mailing list]
+    wget https://github.com/ssrpanel/shadowsocksr/archive/master.zip && unzip master && mv shadowsocksr-master shadowsocksr
 
 
 
-[Android]:           https://github.com/shadowsocks/shadowsocks-android
-[Build Status]:      https://travis-ci.org/falseen/shadowsocks.svg?branch=manyuser-travis
-[Configuration]:     https://github.com/shadowsocks/shadowsocks/wiki/Configuration-via-Config-File
-[Coverage Status]:   https://jenkins.shadowvpn.org/result/shadowsocks
-[Coverage]:          https://jenkins.shadowvpn.org/job/Shadowsocks/ws/PYENV/py34/label/linux/htmlcov/index.html
-[Debian sid]:        https://packages.debian.org/unstable/python/shadowsocks
-[iOS]:               https://github.com/shadowsocks/shadowsocks-iOS/wiki/Help
-[Issue Tracker]:     https://github.com/shadowsocks/shadowsocks/issues?state=open
-[Install Server on Windows]: https://github.com/shadowsocks/shadowsocks/wiki/Install-Shadowsocks-Server-on-Windows
-[Mailing list]:      https://groups.google.com/group/shadowsocks
-[OpenWRT]:           https://github.com/shadowsocks/openwrt-shadowsocks
-[OS X]:              https://github.com/shadowsocks/shadowsocks-iOS/wiki/Shadowsocks-for-OSX-Help
-[PyPI]:              https://pypi.python.org/pypi/shadowsocks
-[PyPI version]:      https://img.shields.io/pypi/v/shadowsocks.svg?style=flat
-[Travis CI]:         https://travis-ci.org/falseen/shadowsocks
-[Troubleshooting]:   https://github.com/shadowsocks/shadowsocks/wiki/Troubleshooting
-[Wiki]:              https://github.com/shadowsocks/shadowsocks/wiki
-[Windows]:           https://github.com/shadowsocks/shadowsocks-csharp
+#### 2.安装cymysql
+
+    sh setup_cymysql2.sh
+
+
+#### 3.编辑节点配置（混淆、协议、限速、IPV6）
+
+    vi user-mysql.json
+
+    protocol 协议，带 _compatible 结尾兼容 原版，直接用原版可以改为 origin
+    protocol_param 协议参数，配置了的话，客户端也要一致
+    obfs 混淆 tls1.2_ticket_auth 可以限制客户端数量 tls1.2_ticket_auth_compatible 兼容原版，直接用原版可以改为 plain
+    obfs_param 混淆参数，当obfs为 tls1.2_ticket_auth 的时候，这个值为 1 到 256 之间，表示限制客户端数量
+    additional_ports 单端口配置，请看wiki
+    additional_ports_only 强制单端口，改为true则所有非设置的单端口都无法连接，只能用additional_ports设置的那些端口连接
+    dns_ipv6 为true时，会优先走ipv6，需要节点服务器至少有一个2开头的ipv6地址（有时候会导致IPV4失效，不推荐开启，你可以自己试试）
+    connect_verbose_info 为1时记录用户访问网址，推荐打开，可以清楚知道连接成功与否
+    redirect 请求失败时返回信息伪造成访问配置里网址
+
+
+#### 4.编辑数据库连接信息
+
+    vi usermysql.json
+
+    host 数据库地址，如果是本机就是127.0.0.1
+    port 数据库连接端口
+    user 数据库连接用户，不推荐使用root
+    password 数据库连接密码
+    db 面板所在数据库
+    node_id 节点ID，对应面板里的 节点列表 最左侧的id（请先将面板搭建好，然后创建一个节点，就有节点ID了）
+    transfer_mul 节点流量计算比例，默认1.0，填1也可以，1表示：用了100M算100M，10表示用了100M算1000M，0.1表示用了100M算10M。
+
+#### 5.运行、关闭、看日志
+
+    sh logrun.sh
+    sh stop.sh
+    sh tail.sh
+
+

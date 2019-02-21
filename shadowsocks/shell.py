@@ -26,7 +26,6 @@ import logging
 from shadowsocks.common import to_bytes, to_str, IPNetwork, PortRange
 from shadowsocks import encrypt
 
-
 VERBOSE_LEVEL = 5
 
 verbose = 0
@@ -53,7 +52,7 @@ def print_exception(e):
         traceback.print_exc()
 
 
-def print_shadowsocks():
+def __version():
     version_str = ''
     try:
         import pkg_resources
@@ -64,60 +63,28 @@ def print_shadowsocks():
             version_str = version.version()
         except Exception:
             pass
-    print('ShadowsocksR %s' % version_str)
+    return version_str
+
+
+def print_shadowsocks():
+    print('ShadowsocksR %s' % __version())
 
 
 def log_shadowsocks_version():
-    version_str = ''
-    try:
-        import pkg_resources
-        version_str = pkg_resources.get_distribution('shadowsocks').version
-    except Exception:
-        try:
-            from shadowsocks import version
-            version_str = version.version()
-        except Exception:
-            pass
-    logging.info('ShadowsocksR %s' % version_str)
+    logging.info('ShadowsocksR %s' % __version())
 
 
 def find_config():
-    config_path = 'user-config.json'
-    if os.path.exists(config_path):
-        return config_path
-    config_path = os.path.join(
-        os.path.dirname(__file__),
-        '../',
-        'user-config.json')
-    if os.path.exists(config_path):
-        return config_path
-
+    user_config_path = 'user-config.json'
     config_path = 'config.json'
-    if os.path.exists(config_path):
-        return config_path
-    config_path = os.path.join(os.path.dirname(__file__), '../', 'config.json')
-    if os.path.exists(config_path):
-        return config_path
-    return None
 
-def find_custom_detect():
-    config_path = 'user-detect.html'
-    if os.path.exists(config_path):
-        return config_path
-    config_path = os.path.join(
-        os.path.dirname(__file__),
-        '../',
-        'user-detect.html')
-    if os.path.exists(config_path):
-        return config_path
+    def sub_find(file_name):
+        if os.path.exists(file_name):
+            return file_name
+        file_name = os.path.join(os.path.abspath('..'), file_name)
+        return file_name if os.path.exists(file_name) else None
 
-    config_path = 'detect.html'
-    if os.path.exists(config_path):
-        return config_path
-    config_path = os.path.join(os.path.dirname(__file__), '../', 'detect.html')
-    if os.path.exists(config_path):
-        return config_path
-    return None
+    return sub_find(user_config_path) or sub_find(config_path)
 
 
 def check_config(config, is_local):
@@ -139,20 +106,20 @@ def check_config(config, is_local):
     if 'local_port' in config:
         config['local_port'] = int(config['local_port'])
 
-    if 'server_port' in config and not isinstance(config['server_port'], list):
+    if 'server_port' in config and type(config['server_port']) != list:
         config['server_port'] = int(config['server_port'])
 
     if config.get('local_address', '') in [b'0.0.0.0']:
-        logging.warn('warning: local set to listen on 0.0.0.0, it\'s not safe')
+        logging.warning('warning: local set to listen on 0.0.0.0, it\'s not safe')
     if config.get('server', '') in ['127.0.0.1', 'localhost']:
-        logging.warn('warning: server set to listen on %s:%s, are you sure?' %
-                     (to_str(config['server']), config['server_port']))
+        logging.warning('warning: server set to listen on %s:%s, are you sure?' %
+                        (to_str(config['server']), config['server_port']))
     if config.get('timeout', 300) < 100:
-        logging.warn('warning: your timeout %d seems too short' %
-                     int(config.get('timeout')))
+        logging.warning('warning: your timeout %d seems too short' %
+                        int(config.get('timeout')))
     if config.get('timeout', 300) > 600:
-        logging.warn('warning: your timeout %d seems too long' %
-                     int(config.get('timeout')))
+        logging.warning('warning: your timeout %d seems too long' %
+                        int(config.get('timeout')))
     if config.get('password') in [b'mypassword']:
         logging.error('DON\'T USE DEFAULT PASSWORD! Please change it in your '
                       'config.json!')
@@ -167,7 +134,8 @@ def check_config(config, is_local):
 
 def get_config(is_local):
     global verbose
-
+    config = {}
+    config_path = None
     logging.basicConfig(level=logging.INFO,
                         format='%(levelname)-s: %(message)s')
     if is_local:
@@ -179,31 +147,30 @@ def get_config(is_local):
         longopts = ['help', 'fast-open', 'pid-file=', 'log-file=', 'workers=',
                     'forbidden-ip=', 'user=', 'manager-address=', 'version']
     try:
-        config_path = find_config()
         optlist, args = getopt.getopt(sys.argv[1:], shortopts, longopts)
         for key, value in optlist:
             if key == '-c':
                 config_path = value
+            elif key in ('-h', '--help'):
+                print_help(is_local)
+                sys.exit(0)
+            elif key == '--version':
+                print_shadowsocks()
+                sys.exit(0)
+            else:
+                continue
+
+        if config_path is None:
+            config_path = find_config()
 
         if config_path:
-            logging.info('loading config from %s' % config_path)
+            logging.debug('loading config from %s' % config_path)
             with open(config_path, 'rb') as f:
                 try:
-                    config = parse_json_in_str(
-                        remove_comment(f.read().decode('utf8')))
+                    config = parse_json_in_str(remove_comment(f.read().decode('utf8')))
                 except ValueError as e:
-                    logging.error('found an error in config.json: %s',
-                                  e.message)
+                    logging.error('found an error in config.json: %s', str(e))
                     sys.exit(1)
-        else:
-            config = {}
-
-        if config.get('friendly_detect', 0):
-            detect_path = find_custom_detect()
-            config['detect_block_html'] = ''
-            with open(detect_path, 'rb') as f:
-                config['detect_block_html'] = bytes(f.read())
-
 
         v_count = 0
         for key, value in optlist:
@@ -243,15 +210,7 @@ def get_config(is_local):
                 config['user'] = to_str(value)
             elif key == '--forbidden-ip':
                 config['forbidden_ip'] = to_str(value)
-            elif key in ('-h', '--help'):
-                if is_local:
-                    print_local_help()
-                else:
-                    print_server_help()
-                sys.exit(0)
-            elif key == '--version':
-                print_shadowsocks()
-                sys.exit(0)
+
             elif key == '-d':
                 config['daemon'] = to_str(value)
             elif key == '--pid-file':
@@ -261,6 +220,8 @@ def get_config(is_local):
             elif key == '-q':
                 v_count -= 1
                 config['verbose'] = v_count
+            else:
+                continue
     except getopt.GetoptError as e:
         print(e, file=sys.stderr)
         print_help(is_local)
@@ -278,23 +239,19 @@ def get_config(is_local):
     config['obfs'] = to_str(config.get('obfs', 'plain'))
     config['obfs_param'] = to_str(config.get('obfs_param', ''))
     config['port_password'] = config.get('port_password', None)
+    config['additional_ports'] = config.get('additional_ports', {})
+    config['additional_ports_only'] = config.get('additional_ports_only', False)
     config['timeout'] = int(config.get('timeout', 300))
     config['udp_timeout'] = int(config.get('udp_timeout', 120))
     config['udp_cache'] = int(config.get('udp_cache', 64))
     config['fast_open'] = config.get('fast_open', False)
     config['workers'] = config.get('workers', 1)
-    config['friendly_detect'] = config.get('friendly_detect', 0)
     config['pid-file'] = config.get('pid-file', '/var/run/shadowsocksr.pid')
     config['log-file'] = config.get('log-file', '/var/log/shadowsocksr.log')
     config['verbose'] = config.get('verbose', False)
-    config['redirect_verbose'] = config.get('redirect_verbose', True)
     config['connect_verbose_info'] = config.get('connect_verbose_info', 0)
     config['local_address'] = to_str(config.get('local_address', '127.0.0.1'))
     config['local_port'] = config.get('local_port', 1080)
-    config['forbidden_ip'] = config.get('forbidden_ip', '')
-    config['forbidden_port'] = config.get('forbidden_port', '')
-    config['disconnect_ip'] = config.get('disconnect_ip', '')
-
     if is_local:
         if config.get('server', None) is None:
             logging.error('server addr not specified')
@@ -304,6 +261,20 @@ def get_config(is_local):
             config['server'] = to_str(config['server'])
     else:
         config['server'] = to_str(config.get('server', '0.0.0.0'))
+        config['black_hostname_list'] = to_str(config.get('black_hostname_list', '')).split(',')
+        if len(config['black_hostname_list']) == 1 and config['black_hostname_list'][0] == '':
+            config['black_hostname_list'] = []
+        try:
+            config['forbidden_ip'] = \
+                IPNetwork(config.get('forbidden_ip', '127.0.0.0/8,::1/128'))
+        except Exception as e:
+            logging.error(e)
+            sys.exit(2)
+        try:
+            config['forbidden_port'] = PortRange(config.get('forbidden_port', ''))
+        except Exception as e:
+            logging.error(e)
+            sys.exit(2)
         try:
             config['ignore_bind'] = \
                 IPNetwork(config.get('ignore_bind', '127.0.0.0/8,::1/128,10.0.0.0/8,192.168.0.0/16'))
@@ -325,10 +296,9 @@ def get_config(is_local):
     else:
         level = logging.INFO
     verbose = config['verbose']
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s %(levelname)-8s %(filename)s:%(lineno)s %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S')
+    logging.basicConfig(level=level,
+                        format='%(asctime)s %(levelname)-8s %(filename)s:%(lineno)s %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
 
     check_config(config, is_local)
 
@@ -434,7 +404,6 @@ def _decode_dict(data):
 
 
 class JSFormat:
-
     def __init__(self):
         self.state = 0
 

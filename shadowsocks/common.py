@@ -23,15 +23,11 @@ import struct
 import logging
 import binascii
 import re
-import hashlib
-import random
-from configloader import load_config, get_config
-
 
 from shadowsocks import lru_cache
 
 def compat_ord(s):
-    if isinstance(s, int):
+    if type(s) == int:
         return s
     return _ord(s)
 
@@ -49,28 +45,18 @@ chr = compat_chr
 
 connect_log = logging.debug
 
-
 def to_bytes(s):
     if bytes != str:
-        if isinstance(s, str):
+        if type(s) == str:
             return s.encode('utf-8')
     return s
 
 
 def to_str(s):
     if bytes != str:
-        if isinstance(s, bytes):
+        if type(s) == bytes:
             return s.decode('utf-8')
     return s
-
-def random_base64_str(randomlength = 8):
-    str = ''
-    chars = 'ABCDEF0123456789'
-    length = len(chars) - 1
-    for i in range(randomlength):
-        str += chars[random.randint(0, length)]
-    return str
-
 
 def int32(x):
     if x > 0xFFFFFFFF or x < 0:
@@ -82,7 +68,6 @@ def int32(x):
         else:
             return -2147483648
     return x
-
 
 def inet_ntop(family, ipstr):
     if family == socket.AF_INET:
@@ -127,7 +112,7 @@ def inet_pton(family, addr):
 def is_ip(address):
     for family in (socket.AF_INET, socket.AF_INET6):
         try:
-            if not isinstance(address, str):
+            if type(address) != str:
                 address = address.decode('utf8')
             inet_pton(family, address)
             return family
@@ -146,21 +131,6 @@ def sync_str_bytes(obj, target_example):
     return obj
 
 
-def match_ipv4_address(text):
-    reip = re.compile(r'(?<![\.\d])(?:\d{1,3}\.){3}\d{1,3}(?![\.\d])')
-    for ip in reip.findall(text):
-        return ip
-    return None
-
-
-def match_ipv6_address(text):
-    reip = re.compile(
-        r'(?<![:.\w])(?:[A-F0-9]{1,4}:){7}[A-F0-9]{1,4}(?![:.\w])')
-    for ip in reip.findall(text):
-        return ip
-    return None
-
-
 def match_regex(regex, text):
     # avoid 'cannot use a string pattern on a bytes-like object'
     regex = sync_str_bytes(regex, text)
@@ -168,27 +138,6 @@ def match_regex(regex, text):
     for item in regex.findall(text):
         return True
     return False
-
-
-def get_mu_host(id, md5):
-    regex_text = get_config().MU_REGEX
-    regex_text = regex_text.replace('%id', str(id))
-    regex_text = regex_text.replace('%suffix', get_config().MU_SUFFIX)
-    regex = re.compile(r'%-?[1-9]\d*m')
-    for item in regex.findall(regex_text):
-        regex_num = item.replace('%', "")
-        regex_num = regex_num.replace('m', "")
-        md5_length = int(regex_num)
-        if md5_length < 0:
-            regex_text = regex_text.replace(item, md5[32 + md5_length:])
-        else:
-            regex_text = regex_text.replace(item, md5[:md5_length])
-    return regex_text
-
-
-def get_md5(data):
-    m1 = hashlib.md5(data.encode('utf-8'))
-    return m1.hexdigest()
 
 
 def patch_socket():
@@ -221,7 +170,6 @@ def pack_addr(address):
     if len(address) > 255:
         address = address[:255]  # TODO
     return b'\x03' + chr(len(address)) + address
-
 
 def pre_parse_header(data):
     if not data:
@@ -264,7 +212,6 @@ def pre_parse_header(data):
             data += ogn_data[data_size:]
     return data
 
-
 def parse_header(data):
     addrtype = ord(data[0])
     dest_addr = None
@@ -305,9 +252,6 @@ def parse_header(data):
         return None
     return connecttype, addrtype, to_bytes(dest_addr), dest_port, header_length
 
-def getRealIp(ip):
-    return to_str(ip.replace("::ffff:", ""))
-
 
 class IPNetwork(object):
     ADDRLENGTH = {socket.AF_INET: 32, socket.AF_INET6: 128, False: 0}
@@ -316,17 +260,13 @@ class IPNetwork(object):
         self.addrs_str = addrs
         self._network_list_v4 = []
         self._network_list_v6 = []
-        if not isinstance(addrs, str):
-            addrs = to_str(addrs)
-        addrs = addrs.split(',')
+        if type(addrs) == str:
+            addrs = addrs.split(',')
         list(map(self.add_network, addrs))
 
     def add_network(self, addr):
         if addr is "":
             return
-
-        addr = addr.replace("::ffff:", "")
-
         block = addr.split('/')
         addr_family = is_ip(block[0])
         addr_len = IPNetwork.ADDRLENGTH[addr_family]
@@ -355,8 +295,6 @@ class IPNetwork(object):
             self._network_list_v6.append((ip, prefix_size))
 
     def __contains__(self, addr):
-        addr = addr.replace("::ffff:", "")
-
         addr_family = is_ip(addr)
         if addr_family is socket.AF_INET:
             ip, = struct.unpack("!I", socket.inet_aton(addr))
@@ -380,7 +318,6 @@ class IPNetwork(object):
         return self.addrs_str != other.addrs_str
 
 class PortRange(object):
-
     def __init__(self, range_str):
         self.range_str = to_str(range_str)
         self.range = set()
@@ -456,12 +393,12 @@ def test_inet_conv():
 
 def test_parse_header():
     assert parse_header(b'\x03\x0ewww.google.com\x00\x50') == \
-        (0, ADDRTYPE_HOST ,b'www.google.com', 80, 18)
+        (0, ADDRTYPE_HOST, b'www.google.com', 80, 18)
     assert parse_header(b'\x01\x08\x08\x08\x08\x00\x35') == \
-        (0, ADDRTYPE_IPV4 ,b'8.8.8.8', 53, 7)
+        (0, ADDRTYPE_IPV4, b'8.8.8.8', 53, 7)
     assert parse_header((b'\x04$\x04h\x00@\x05\x08\x05\x00\x00\x00\x00\x00'
                          b'\x00\x10\x11\x00\x50')) == \
-        (0, ADDRTYPE_IPV6 ,b'2404:6800:4005:805::1011', 80, 19)
+        (0, ADDRTYPE_IPV6, b'2404:6800:4005:805::1011', 80, 19)
 
 
 def test_pack_header():
@@ -501,7 +438,6 @@ def test_match_regex():
     assert match_regex(r'a\.b', b'abc,aaa,aaa,b,aaa.b,a.b')
     assert match_regex(r'\bgoogle\.com\b', b' google.com ')
     pass
-
 
 if __name__ == '__main__':
     test_sync_str_bytes()

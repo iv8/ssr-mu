@@ -22,11 +22,17 @@ import logging
 
 
 def find_library_nt(name):
+    # type: (str) -> list
+    """
+    find lib in windows in all the directory in path env
+
+    :param name: can end with `.dll` or not
+    :return: lib results list
+    """
     # modified from ctypes.util
     # ctypes.util.find_library just returns first result he found
     # but we want to try them all
     # because on Windows, users may have both 32bit and 64bit version installed
-    import glob
     results = []
     for directory in os.environ['PATH'].split(os.pathsep):
         fname = os.path.join(directory, name)
@@ -34,34 +40,15 @@ def find_library_nt(name):
             results.append(fname)
         if fname.lower().endswith(".dll"):
             continue
-        fname += "*.dll"
-        files = glob.glob(fname)
-        if files:
-            results.extend(files)
+        fname = fname + ".dll"
+        if os.path.isfile(fname):
+            results.append(fname)
     return results
 
 
-def load_library(path, search_symbol, library_name):
-    from ctypes import CDLL
-    try:
-        lib = CDLL(path)
-        if hasattr(lib, search_symbol):
-            logging.info('loading %s from %s', library_name, path)
-            return lib
-        else:
-            logging.warn('can\'t find symbol %s in %s', search_symbol,
-                         path)
-    except Exception:
-        pass
-    return None
-
-
-def find_library(possible_lib_names, search_symbol, library_name,
-                 custom_path=None):
+def find_library(possible_lib_names, search_symbol, library_name):
     import ctypes.util
-
-    if custom_path:
-        return load_library(custom_path, search_symbol, library_name)
+    from ctypes import CDLL
 
     paths = []
 
@@ -101,22 +88,17 @@ def find_library(possible_lib_names, search_symbol, library_name,
                 if files:
                     paths.extend(files)
     for path in paths:
-        lib = load_library(path, search_symbol, library_name)
-        if lib:
-            return lib
-    return None
-
-
-def parse_mode(cipher_nme):
-    """
-    Parse the cipher mode from cipher name
-    e.g. aes-128-gcm, the mode is gcm
-    :param cipher_nme: str cipher name, aes-128-cfb, aes-128-gcm ...
-    :return: str/None The mode, cfb, gcm ...
-    """
-    hyphen = cipher_nme.rfind('-')
-    if hyphen > 0:
-        return cipher_nme[hyphen:]
+        try:
+            lib = CDLL(path)
+            if hasattr(lib, search_symbol):
+                logging.info('loading %s from %s', library_name, path)
+                return lib
+            else:
+                logging.warn('can\'t find symbol %s in %s', search_symbol,
+                             path)
+        except Exception:
+            if path == paths[-1]:
+                raise
     return None
 
 
@@ -125,31 +107,29 @@ def run_cipher(cipher, decipher):
     import random
     import time
 
-    block_size = 16384
+    BLOCK_SIZE = 16384
     rounds = 1 * 1024
-    plain = urandom(block_size * rounds)
+    plain = urandom(BLOCK_SIZE * rounds)
 
-    cipher_results = []
+    results = []
     pos = 0
     print('test start')
     start = time.time()
     while pos < len(plain):
         l = random.randint(100, 32768)
-        # print(pos, l)
-        c = cipher.encrypt_once(plain[pos:pos + l])
-        cipher_results.append(c)
+        c = cipher.update(plain[pos:pos + l])
+        results.append(c)
         pos += l
     pos = 0
-    # c = b''.join(cipher_results)
-    plain_results = []
-    for c in cipher_results:
-        # l = random.randint(100, 32768)
-        l = len(c)
-        plain_results.append(decipher.decrypt_once(c))
+    c = b''.join(results)
+    results = []
+    while pos < len(plain):
+        l = random.randint(100, 32768)
+        results.append(decipher.update(c[pos:pos + l]))
         pos += l
     end = time.time()
-    print('speed: %d bytes/s' % (block_size * rounds / (end - start)))
-    assert b''.join(plain_results) == plain
+    print('speed: %d bytes/s' % (BLOCK_SIZE * rounds / (end - start)))
+    assert b''.join(results) == plain
 
 
 def test_find_library():
